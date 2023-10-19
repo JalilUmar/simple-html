@@ -1,0 +1,180 @@
+<!-- index.html -->
+
+<!DOCTYPE html>
+<html lang="cs">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detail Bytu</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f7f9fc;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+
+        form {
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        input[type="text"],
+        input[type="file"] {
+            width: 100%;
+            padding: 12px 15px;
+            margin-bottom: 15px;
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+            font-size: 16px;
+            transition: border 0.3s ease;
+        }
+
+        input[type="text"]:focus,
+        input[type="file"]:focus {
+            border-color: #0077b6;
+            outline: none;
+        }
+
+        button {
+            padding: 12px 20px;
+            background-color: #0077b6;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #005f8d;
+        }
+
+        div {
+            max-width: 600px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+
+</head>
+
+
+<body>
+
+    <form>
+        Ulice: <input type="text" id="ulice"><br>
+        Město: <input type="text" id="mesto"><br>
+        Dispozice: <input type="text" id="dispozice"><br>
+        Rozměry: <input type="text" id="rozmer"><br>
+        Cena: <input type="text" id="cena"><br>
+        Fotografie: <input type="file" id="fotografie" multiple><br>
+        <button type="button" onclick="createAd()">Vytvořit Inzerát</button>
+        <button type="button" onclick="findSimilarAds()">Najdi podobné inzeráty</button>
+    </form>
+
+    <div id="adOutput"></div>
+    <div id="similarAdsOutput"></div>
+
+    <script>
+        async function createAd() {
+            let ulice = document.getElementById('ulice').value;
+            let mesto = document.getElementById('mesto').value;
+            let dispozice = document.getElementById('dispozice').value;
+            let rozmer = document.getElementById('rozmer').value;
+            let cena = document.getElementById('cena').value;
+            let files = document.getElementById('fotografie').files;
+
+            let photoDescriptions = [];
+            for (let i = 0; i < files.length; i++) {
+                let imageUrl = await uploadImageToServer(files[i]);
+                let description = await getPhotoDescription(imageUrl);
+                photoDescriptions.push(description);
+            }
+
+            let photoDescriptionText = photoDescriptions.join(', ');
+
+            let query = `Vytvoř inzerát bytu na prodej v ulici ${ulice}, město ${mesto} s dispozicí ${dispozice}, rozměry ${rozmer}, cenou ${cena} a fotografiemi s popisem: ${photoDescriptionText}.`;
+
+            let ad = await communicateWithGPT(query);
+            document.getElementById('adOutput').innerText = ad;
+        }
+
+        async function findSimilarAds() {
+            let ulice = document.getElementById('ulice').value;
+            let mesto = document.getElementById('mesto').value;
+            let dispozice = document.getElementById('dispozice').value;
+            let rozmer = document.getElementById('rozmer').value;
+            let cena = document.getElementById('cena').value;
+
+            let query = `Najdi 5 podobných inzerátů bytů na prodej v okolí ulice ${ulice}, město ${mesto} s dispozicí ${dispozice}, rozměry ${rozmer} a cenou ${cena}.`;
+
+            let similarAds = await communicateWithGPT(query);
+            document.getElementById('similarAdsOutput').innerText = similarAds;
+        }
+
+        async function getPhotoDescription(imageUrl) {
+            let response = await fetch('https://api.scenex.jina.ai/v1/describe', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer JGAuFbcRUvtOhHtb71Bs:e6e27baa633a2b955f9ce3b927611eac8b8a9bbadd35f2d17c986b715d17b71e'
+                },
+                body: JSON.stringify({
+                    image: imageUrl
+                })
+            });
+
+            let data = await response.json();
+            return data.description; // Assuming SceneXplain returns description in the "description" key.
+        }
+
+        async function uploadImageToServer(file) {
+            let formData = new FormData();
+            formData.append('file', file);
+
+            let response = await fetch('http://localhost:3000/upload', {
+                method: 'POST',
+                body: formData
+            });
+
+            let data = await response.json();
+            return data.imageUrl;
+        }
+
+        async function communicateWithGPT(query) {
+            const OPENAI_ENDPOINT = "https://api.openai.com/v1/engines/davinci/completions";
+            const OPENAI_API_KEY = "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"; // Váš poskytnutý API klíč
+
+            let response = await fetch(OPENAI_ENDPOINT, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${OPENAI_API_KEY}`
+                },
+                body: JSON.stringify({
+                    prompt: query,
+                    max_tokens: 150
+                })
+            });
+
+            let data = await response.json();
+            return data.choices[0].text.trim();
+        }
+
+
+    </script>
+
+</body>
+
+</html>
